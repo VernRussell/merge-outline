@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/VernRussell/VernRussell/models" // Adjust import path
+	"github.com/VernRussell/merge-outline/models" // Adjust import path
 	"github.com/xrash/smetrics"
 )
 
