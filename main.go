@@ -21,26 +21,26 @@ func main() {
 	frequentWords := utils.CalculateFrequentWords(book)
 
 	// Merge duplicate chapters
-	mergeDuplicateChapters(book, logger, 0.8, frequentWords)
+	utils.MergeDuplicateChapters(book, logger, 0.8, frequentWords)
 
 	// Merge fuzzy sections
-	discardFuzzyMatchedSections(book, logger, frequentWords)
+	utils.DiscardFuzzyMatchedSections(book, logger, frequentWords)
 
 	// Remove duplicate descriptions
-	removeDuplicateDescriptions(book, logger)
+	utils.RemoveDuplicateDescriptions(book, logger)
 
 	// Renumber chapters and sections
-	renumberChaptersAndSections(book)
+	utils.RenumberChaptersAndSections(book)
 
 	// Write updated book to JSON
-	err := writeBookToJson(book, outputFile)
+	err := utils.WriteBookToJson(book, outputFile)
 	if err != nil {
 		log.Fatalf("Error writing book to JSON: %v", err)
 	}
 
 	// Regenerate the markdown file
 	newMDFileName := "New_" + inputFile
-	err = regenerateMdFile(book, newMDFileName)
+	err = utils.RegenerateMdFile(book, newMDFileName)
 	if err != nil {
 		log.Fatalf("Error writing book to MD File: %v", err)
 	}

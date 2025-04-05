@@ -1,4 +1,4 @@
-// models/book.go
+// models/models.go
 package models
 
 type Point struct {
