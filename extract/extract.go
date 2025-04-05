@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/VernRussell/project-name/models" // Adjust import path
+	"github.com/VernRussell/VernRussell/models" // Adjust import path
 	"github.com/xrash/smetrics"
 )
 
