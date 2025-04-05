@@ -1,44 +1,50 @@
-// main.go
 package main
 
 import (
 	"log"
 	"os"
 
-	"github.com/VernRussell/merge-outline/extract"
-	"github.com/VernRussell/merge-outline/utils" // Adjust import path
-	// Adjust import path
+	"github.com/VernRussell/merge-outline/parse"
+	"github.com/VernRussell/merge-outline/utils"
 )
 
 func main() {
-	// Provide the path to your JSON file
-	inputFile := "./ContainerGardening.json"
-	outputFile := "./ContainerGardeningUpdated.json"
+	// Parsing the markdown
+	inputFile := "ContainerGardening.md"
+	outputFile := "ContainerGardening.json"
+	book := parse.ParseMarkdownToBook(inputFile)
 
-	// Load the book data
-	book, err := utils.LoadBook(inputFile)
-	if err != nil {
-		log.Fatalf("Error loading book: %v", err)
-	}
-
-	// Create a logger for output
+	// Create logger
 	logger := log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
 
+	// Calculate frequent words map for fuzzy comparison
+	frequentWords := utils.CalculateFrequentWords(book)
+
 	// Merge duplicate chapters
-	extract.MergeDuplicateChapters(book, logger)
+	mergeDuplicateChapters(book, logger, 0.8, frequentWords)
 
-	// Remove duplicate descriptions based on the header
-	extract.RemoveDuplicateDescriptions(book, logger)
+	// Merge fuzzy sections
+	discardFuzzyMatchedSections(book, logger, frequentWords)
 
-	// Write the updated book to a JSON file
-	err = utils.WriteBookToJson(book, outputFile)
+	// Remove duplicate descriptions
+	removeDuplicateDescriptions(book, logger)
+
+	// Renumber chapters and sections
+	renumberChaptersAndSections(book)
+
+	// Write updated book to JSON
+	err := writeBookToJson(book, outputFile)
 	if err != nil {
 		log.Fatalf("Error writing book to JSON: %v", err)
 	}
 
-	// Extract description numbers and headers and print them
-	extract.ExtractDescriptionNumbersAndHeaders(book)
+	// Regenerate the markdown file
+	newMDFileName := "New_" + inputFile
+	err = regenerateMdFile(book, newMDFileName)
+	if err != nil {
+		log.Fatalf("Error writing book to MD File: %v", err)
+	}
 
-	// Optionally log success
+	// Log success
 	logger.Println("Book successfully updated and written to JSON.")
 }
