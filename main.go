@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 
+	"github.com/VernRussell/merge-outline/merge"
 	"github.com/VernRussell/merge-outline/parse"
 	"github.com/VernRussell/merge-outline/utils"
 )
@@ -38,11 +40,23 @@ func main() {
 	// Merge duplicate chapters
 	utils.MergeDuplicateChapters(book, logger, 0.8, frequentWords)
 
+	chaptersToInclude := merge.GenerateChaptersToInclude(book)
+	fmt.Println(chaptersToInclude)
+
+	matchedChapters := merge.CompareChaptersWithFrequentWords(book, logger, frequentWords)
+	fmt.Println(matchedChapters)
+
+	// List of n-gram sizes you want to process (e.g., 2, 3, and 7)
+	ngramSizes := []int{2, 3, 7}
+
+	// Call the processChapters function to collect, compare, and print the n-grams
+	merge.ProcessChapters(book, logger, ngramSizes, chaptersToInclude, frequentWords)
+
 	// Merge fuzzy sections
-	utils.DiscardFuzzyMatchedSections(book, logger, frequentWords)
+	merge.DiscardFuzzyMatchedSections(book, logger, frequentWords)
 
 	// Remove duplicate descriptions
-	utils.RemoveDuplicateDescriptions(book, logger)
+	merge.RemoveDuplicateDescriptions(book, logger)
 
 	// Renumber chapters and sections
 	utils.RenumberChaptersAndSections(book)
@@ -59,6 +73,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error writing book to MD File: %v", err)
 	}
+
+	utils.ListChaptersAndSections(book)
 
 	// Log success
 	logger.Println("Book successfully updated and written to JSON.")
