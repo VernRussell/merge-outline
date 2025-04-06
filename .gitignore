@@ -20,3 +20,9 @@
 # Ignore operating system specific files
 .DS_Store
 Thumbs.db
+
+# Ignore output files and directories
+output/
+*.json
+*.log
+*.tmp
