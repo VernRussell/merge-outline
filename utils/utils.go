@@ -168,19 +168,28 @@ func CompareFiles(file1, file2, logFile string) error {
 }
 
 // Function to print chapters and their sections
+// Function to print chapters and their sections, writing clean output to a .txt file
 func ListChaptersAndSections(book *models.Book) {
+	// Open the file for writing (create it if it doesn't exist)
+	logFile, err := os.OpenFile("ChaptersAndSections.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Printf("Error opening log file: %v", err)
+		return
+	}
+	defer logFile.Close()
+
 	// Iterate through the chapters in the book
 	for _, chapter := range book.Chapters {
-		// Print the chapter number and title
-		fmt.Printf("Chapter %s: %s\n", chapter.ChapterNumber, chapter.Title)
+		// Write the chapter number and title to the file
+		fmt.Fprintf(logFile, "Chapter %s: %s\n", chapter.ChapterNumber, chapter.Title)
 
 		// Iterate through the sections in the current chapter
 		for _, section := range chapter.Sections {
-			// Print the section number and title, slightly indented
-			fmt.Printf("    Section %s: %s\n", section.SectionNumber, section.SectionTitle)
+			// Write the section number and title to the file, slightly indented
+			fmt.Fprintf(logFile, "    Section %s: %s\n", section.SectionNumber, section.SectionTitle)
 		}
 
 		// Add an extra line between chapters for better readability
-		fmt.Println()
+		fmt.Fprintln(logFile)
 	}
 }

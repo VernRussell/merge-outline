@@ -105,7 +105,7 @@ func ParseMarkdownToBook(filename string) *models.Book {
 						Title: "Introduction",
 					}
 				}
-				fmt.Println("Processing: Introduction")
+				log.Println("Processing: Introduction")
 			}
 			//isInIntroduction := true
 			continue
@@ -119,7 +119,7 @@ func ParseMarkdownToBook(filename string) *models.Book {
 					}
 					currentSection = nil
 				}
-				fmt.Println("Processing: Conclusion")
+				log.Println("Processing: Conclusion")
 			}
 			//isInIntroduction = false
 			continue

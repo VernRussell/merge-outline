@@ -52,11 +52,11 @@ func main() {
 	// Call the processChapters function to collect, compare, and print the n-grams
 	merge.ProcessChapters(book, logger, ngramSizes, chaptersToInclude, frequentWords)
 
-	// Merge fuzzy sections
-	merge.DiscardFuzzyMatchedSections(book, logger, frequentWords)
-
 	// Remove duplicate descriptions
 	merge.RemoveDuplicateDescriptions(book, logger)
+
+	// Merge fuzzy sections
+	merge.DiscardFuzzyMatchedSections(book, logger, frequentWords)
 
 	// Renumber chapters and sections
 	utils.RenumberChaptersAndSections(book)
