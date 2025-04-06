@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"encoding/json"
+	"bufio"
 	"fmt"
 	"log"
 	"os"
@@ -98,33 +98,76 @@ func RenumberChaptersAndSections(book *models.Book) {
 	}
 }
 
-// writeBookToJson writes the Book object to a JSON file
-func WriteBookToJson(book *models.Book, filename string) error {
-	// Create and open the file for writing
-	file, err := os.Create(filename)
+// Function to compare two files and report differences to a log file
+func CompareFiles(file1, file2, logFile string) error {
+	// Open the log file for appending, create it if it doesn't exist
+	logFileHandle, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return fmt.Errorf("error creating file: %v", err)
+		return fmt.Errorf("error opening log file: %v", err)
 	}
-	defer file.Close()
+	defer logFileHandle.Close()
 
-	// Marshal the Book object into a formatted JSON string
-	jsonData, err := json.MarshalIndent(book, "", "    ")
+	// Set up the logger to write to the log file
+	logger := log.New(logFileHandle, "DIFFERENCE: ", log.Ldate|log.Ltime|log.Lshortfile)
+
+	// Open the first file
+	f1, err := os.Open(file1)
 	if err != nil {
-		return fmt.Errorf("error marshalling book to JSON: %v", err)
+		return fmt.Errorf("error opening file1: %v", err)
 	}
+	defer f1.Close()
 
-	// Write the JSON data to the file
-	_, err = file.Write(jsonData)
+	// Open the second file
+	f2, err := os.Open(file2)
 	if err != nil {
-		return fmt.Errorf("error writing JSON to file: %v", err)
+		return fmt.Errorf("error opening file2: %v", err)
+	}
+	defer f2.Close()
+
+	// Create scanners for both files to read line by line
+	scanner1 := bufio.NewScanner(f1)
+	scanner2 := bufio.NewScanner(f2)
+
+	lineNumber := 1
+	differencesFound := false
+
+	// Compare the files line by line
+	for scanner1.Scan() || scanner2.Scan() {
+		// Read the current line from each file
+		line1 := scanner1.Text()
+		line2 := scanner2.Text()
+
+		// If one file has a line while the other doesn't
+		if scanner1.Err() != nil || scanner2.Err() != nil {
+			return fmt.Errorf("error reading files: %v", err)
+		}
+
+		// If the lines are different
+		if line1 != line2 {
+			differencesFound = true
+			// Log the differences to the log file
+			logger.Printf("Line %d:\n", lineNumber)
+			if line1 != "" {
+				logger.Printf("  File1: %s\n", line1)
+			} else {
+				logger.Println("  File1: <No content>")
+			}
+			if line2 != "" {
+				logger.Printf("  File2: %s\n", line2)
+			} else {
+				logger.Println("  File2: <No content>")
+			}
+			logger.Println()
+		}
+		lineNumber++
 	}
 
-	return nil
-}
+	// If differences are found, return an error
+	if differencesFound {
+		return fmt.Errorf("the files are not identical")
+	}
 
-// regenerateMdFile regenerates the markdown file from the Book object
-func RegenerateMdFile(book *models.Book, filename string) error {
-	// Logic to regenerate markdown from the Book object
-	// For now, this is just a placeholder
+	// If no differences, return nil (no error)
+	fmt.Println("The files are identical.")
 	return nil
 }

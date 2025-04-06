@@ -12,7 +12,22 @@ func main() {
 	// Parsing the markdown
 	inputFile := "ContainerGardening.md"
 	outputFile := "ContainerGardening.json"
+	//logFile := "comparison.log" // The log file where differences will be written
+
 	book := parse.ParseMarkdownToBook(inputFile)
+
+	// Regenerate the markdown file
+	confirmMDFileName := "Confirm_" + inputFile
+	err := parse.RegenerateMdFile(book, confirmMDFileName)
+	if err != nil {
+		log.Fatalf("Error writing book to MD File: %v", err)
+	}
+
+	// Compare the files
+	//err = utils.CompareFiles(outputFile, confirmMDFileName, logFile)
+	//if err != nil {
+	//	log.Fatalf("File written back is not idential: %v", err)
+	//}
 
 	// Create logger
 	logger := log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
@@ -33,14 +48,14 @@ func main() {
 	utils.RenumberChaptersAndSections(book)
 
 	// Write updated book to JSON
-	err := utils.WriteBookToJson(book, outputFile)
+	err = parse.WriteBookToJson(book, outputFile)
 	if err != nil {
 		log.Fatalf("Error writing book to JSON: %v", err)
 	}
 
 	// Regenerate the markdown file
 	newMDFileName := "New_" + inputFile
-	err = utils.RegenerateMdFile(book, newMDFileName)
+	err = parse.RegenerateMdFile(book, newMDFileName)
 	if err != nil {
 		log.Fatalf("Error writing book to MD File: %v", err)
 	}

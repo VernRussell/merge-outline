@@ -2,6 +2,7 @@ package parse
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -224,4 +225,158 @@ func ParseMarkdownToBook(filename string) *models.Book {
 	}
 
 	return book
+}
+
+// Function to regenerate markdown from the models.Book object
+func RegenerateMdFile(book *models.Book, filename string) error {
+	// Open or create the output markdown file
+	file, err := os.Create(filename)
+	if err != nil {
+		return fmt.Errorf("error creating file: %v", err)
+	}
+	defer file.Close()
+
+	// Write the title of the book with markdown formatting
+	_, err = file.WriteString(fmt.Sprintf("### **%s**\n\n", book.Title))
+	if err != nil {
+		return fmt.Errorf("error writing to file: %v", err)
+	}
+
+	// Write Introduction if it exists
+	if book.Intro != nil {
+		_, err = file.WriteString("### **Introduction**\n")
+		if err != nil {
+			return fmt.Errorf("error writing to file: %v", err)
+		}
+
+		// Write all descriptions in Introduction
+		for _, desc := range book.Intro.Descriptions {
+			err = WriteDescriptionToFile(file, desc)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Add a blank line after Introduction before Chapter 1 starts
+		_, err = file.WriteString("\n") // Adds an extra blank line after Introduction
+		if err != nil {
+			return fmt.Errorf("error writing blank line after Introduction: %v", err)
+		}
+	}
+
+	// Write all chapters
+	for _, chapter := range book.Chapters {
+		// Write the chapter title (for example, Chapter 2)
+		_, err = file.WriteString(fmt.Sprintf("### **%s\\. %s**\n", chapter.ChapterNumber, chapter.Title))
+		if err != nil {
+			return fmt.Errorf("error writing to file: %v", err)
+		}
+
+		// Add a blank line after the chapter title before the first section
+		_, err = file.WriteString("\n") // Blank line between chapter and first section
+		if err != nil {
+			return fmt.Errorf("error writing blank line after chapter title: %v", err)
+		}
+
+		// Write all sections within the chapter
+		for _, section := range chapter.Sections {
+			// Write the section title
+			_, err = file.WriteString(fmt.Sprintf("#### **%s**\n", section.SectionTitle))
+			if err != nil {
+				return fmt.Errorf("error writing section title: %v", err)
+			}
+
+			// Write all descriptions within the section
+			for _, desc := range section.Descriptions {
+				err = WriteDescriptionToFile(file, desc)
+				if err != nil {
+					return err
+				}
+			}
+
+			// Add a blank line after descriptions in the section (optional, depending on the structure)
+			_, err = file.WriteString("\n") // Blank line after section descriptions (if desired)
+			if err != nil {
+				return fmt.Errorf("error writing blank line after section descriptions: %v", err)
+			}
+		}
+	}
+
+	// Write Conclusion if it exists
+	if book.Conclusion != nil {
+		_, err = file.WriteString("### **Conclusion**\n")
+		if err != nil {
+			return fmt.Errorf("error writing to file: %v", err)
+		}
+
+		// Write all descriptions in Conclusion
+		for _, desc := range book.Conclusion.Descriptions {
+			err = WriteDescriptionToFile(file, desc)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// Helper function to write a description to the markdown file
+// Function to write a description to the markdown file
+func WriteDescriptionToFile(file *os.File, description models.Description) error {
+	// Add a blank line before the description
+	_, err := file.WriteString("\n")
+	if err != nil {
+		return fmt.Errorf("error writing blank line before description: %v", err)
+	}
+
+	// Write the description header and text on the same line
+	_, err = file.WriteString(fmt.Sprintf("**%s**: %s", description.DescriptionHeader, description.DescriptionText))
+	if err != nil {
+		return fmt.Errorf("error writing description header and text: %v", err)
+	}
+
+	// Add a blank line after the description before points
+	_, err = file.WriteString("\n") // This adds the blank line after description and before points
+	if err != nil {
+		return fmt.Errorf("error writing blank line after description: %v", err)
+	}
+
+	// Adds an extra blank line before Points
+	_, err = file.WriteString("\n") // Adds an extra blank line before Points
+
+	// Write all points in the description
+	for _, point := range description.Points {
+		// Write the point, starting with "* " and no extra indentation
+		_, err = file.WriteString(fmt.Sprintf("* %s\n", point.PointText))
+		if err != nil {
+			return fmt.Errorf("error writing point: %v", err)
+		}
+	}
+
+	return nil
+}
+
+// writeBookToJson writes the Book object to a JSON file
+func WriteBookToJson(book *models.Book, filename string) error {
+	// Create and open the file for writing
+	file, err := os.Create(filename)
+	if err != nil {
+		return fmt.Errorf("error creating file: %v", err)
+	}
+	defer file.Close()
+
+	// Marshal the Book object into a formatted JSON string
+	jsonData, err := json.MarshalIndent(book, "", "    ")
+	if err != nil {
+		return fmt.Errorf("error marshalling book to JSON: %v", err)
+	}
+
+	// Write the JSON data to the file
+	_, err = file.Write(jsonData)
+	if err != nil {
+		return fmt.Errorf("error writing JSON to file: %v", err)
+	}
+
+	return nil
 }
