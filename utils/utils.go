@@ -30,35 +30,98 @@ func CalculateFrequentWords(book *models.Book) map[string]int {
 }
 
 // FuzzySimilarity calculates the similarity between two strings using the Jaro-Winkler distance
-func FuzzySimilarity(s1, s2 string) float64 {
-	return smetrics.JaroWinkler(s1, s2, 0.7, 4)
+func FuzzySimilarity(book *models.Book, logger *log.Logger, frequentWords map[string]int, s1, s2 string) float64 {
+	// Use JaroWinkler or any other fuzzy matching algorithm
+	return smetrics.JaroWinkler(s1, s2, 0.7, 4) // Adjust thresholds if needed
 }
 
-// mergeDuplicateChapters merges duplicate chapters based on a fuzzy similarity threshold
+// Function to merge duplicate chapters by fuzzy matching their titles
 func MergeDuplicateChapters(book *models.Book, logger *log.Logger, threshold float64, frequentWords map[string]int) {
-	// Logic to merge duplicate chapters based on fuzzy similarity
-	logger.Println("Merging duplicate chapters based on fuzzy similarity...")
-	// Example: iterate over the chapters and merge them based on similarity threshold
+	// Loop through the chapters to find duplicates
 	for i := 0; i < len(book.Chapters); i++ {
+		originalChapter := &book.Chapters[i]
+
+		// Compare this chapter with all subsequent chapters
 		for j := i + 1; j < len(book.Chapters); j++ {
-			if FuzzySimilarity(book.Chapters[i].Title, book.Chapters[j].Title) > threshold {
-				// Merge chapters logic (you can adjust as needed)
-				// For now, let's just log the matching titles
-				logger.Printf("Merging chapters: %s and %s\n", book.Chapters[i].Title, book.Chapters[j].Title)
+			duplicateChapter := &book.Chapters[j]
+
+			// Perform fuzzy comparison of the chapter titles
+			similarity := FuzzySimilarity(book, logger, frequentWords, originalChapter.Title, duplicateChapter.Title)
+
+			if similarity > threshold {
+				// Log the merge process
+				logger.Printf("Merging Chapter %s (%s) with Chapter %s (%s) due to fuzzy match: %.2f\n",
+					originalChapter.ChapterNumber, originalChapter.Title, duplicateChapter.ChapterNumber, duplicateChapter.Title, similarity)
+
+				// Move sections from duplicate chapter to the original chapter
+				// The sections from the duplicate chapter are added to the original chapter without renumbering
+				for _, duplicateSection := range duplicateChapter.Sections {
+					originalChapter.Sections = append(originalChapter.Sections, duplicateSection)
+
+					// Renumber descriptions and points in each section, but keep the original section numbers
+					for k := 0; k < len(duplicateSection.Descriptions); k++ {
+						duplicateSection.Descriptions[k].DescriptionNumber = fmt.Sprintf("%s.%d", duplicateSection.SectionNumber, k+1)
+
+						// Renumber points in the description if necessary
+						for p := 0; p < len(duplicateSection.Descriptions[k].Points); p++ {
+							duplicateSection.Descriptions[k].Points[p].PointNumber = fmt.Sprintf("%s.%d", duplicateSection.Descriptions[k].DescriptionNumber, p+1)
+						}
+					}
+				}
+
+				// Remove the duplicate chapter
+				book.Chapters = append(book.Chapters[:j], book.Chapters[j+1:]...)
+				j-- // Adjust the index after removal
 			}
 		}
 	}
 }
 
 // discardFuzzyMatchedSections discards sections that match with other sections based on fuzzy similarity
+// Function to discard fuzzy matched sections within a chapter of the book
 func DiscardFuzzyMatchedSections(book *models.Book, logger *log.Logger, frequentWords map[string]int) {
-	// Logic to discard sections based on fuzzy matching
-	logger.Println("Discarding fuzzy matched sections...")
-	// Example: iterate through sections and discard duplicates
-	for i := 0; i < len(book.Chapters); i++ {
-		for j := i + 1; j < len(book.Chapters); j++ {
-			// Implement fuzzy matching logic and discard based on similarity
+	// Iterate through each chapter in the book
+	for chapterIdx := range book.Chapters {
+		chapter := &book.Chapters[chapterIdx]
+		sections := chapter.Sections
+		remainingSections := []models.Section{}  // Will hold sections that are not discarded
+		processed := make([]bool, len(sections)) // Track which sections are processed (discarded)
+
+		// Iterate through each section within the current chapter
+		for i := 0; i < len(sections); i++ {
+			if processed[i] {
+				continue // Skip already processed (discarded) sections
+			}
+
+			currentSection := sections[i]
+
+			// Compare current section to all other sections within this chapter
+			for j := i + 1; j < len(sections); j++ {
+				if processed[j] {
+					continue // Skip already processed (discarded) sections
+				}
+
+				// Perform fuzzy comparison of the section titles (using SectionTitle)
+				titleSimilarity := FuzzySimilarity(book, logger, frequentWords, currentSection.SectionTitle, sections[j].SectionTitle)
+
+				// If the sections are similar enough, discard the second one
+				if titleSimilarity > 0.8 { // You can adjust the threshold value here
+					// Log that the section is being discarded
+					//logger.Printf("Discarding Section %s (%s) due to fuzzy match with Section %s (%s): %.2f\n",
+					//	currentSection.SectionNumber, currentSection.SectionTitle,
+					//	sections[j].SectionNumber, sections[j].SectionTitle, titleSimilarity)
+
+					// Mark the second section as processed (discarded)
+					processed[j] = true
+				}
+			}
+
+			// Add the non-discarded section to the list
+			remainingSections = append(remainingSections, currentSection)
 		}
+
+		// Update the chapter with the remaining sections (those not discarded)
+		chapter.Sections = remainingSections
 	}
 }
 
