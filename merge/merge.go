@@ -83,7 +83,7 @@ func DiscardFuzzyMatchedSections(book *models.Book, logger *log.Logger, frequent
 				}
 
 				// Perform fuzzy comparison of the section titles (using SectionTitle)
-				titleSimilarity := utils.FuzzySimilarity(book, logger, frequentWords, currentSection.SectionTitle, sections[j].SectionTitle)
+				titleSimilarity := utils.FuzzySimilarity(book, logger, frequentWords, currentSection.SectionTitle, sections[j].SectionTitle, 0.8)
 
 				// If the sections are similar enough, discard the second one
 				if titleSimilarity > 0.8 { // You can adjust the threshold value here

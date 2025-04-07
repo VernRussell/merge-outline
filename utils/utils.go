@@ -32,13 +32,23 @@ func CalculateFrequentWords(book *models.Book) map[string]int {
 }
 
 // FuzzySimilarity calculates the similarity between two strings using the Jaro-Winkler distance
-func FuzzySimilarity(book *models.Book, logger *log.Logger, frequentWords map[string]int, s1, s2 string) float64 {
+// and compares it against a configurable threshold.
+func FuzzySimilarity(book *models.Book, logger *log.Logger, frequentWords map[string]int, s1, s2 string, threshold float64) float64 {
 	// Use JaroWinkler or any other fuzzy matching algorithm
-	return smetrics.JaroWinkler(s1, s2, 0.7, 4) // Adjust thresholds if needed
+	similarity := smetrics.JaroWinkler(s1, s2, 0.7, 4) // Adjust thresholds if needed
+
+	// Compare the similarity with the threshold and return the similarity
+	if similarity >= threshold {
+		return similarity
+	}
+	return 0.0 // Return 0 if similarity is below threshold
 }
 
 // Function to merge duplicate chapters by fuzzy matching their titles
 func MergeDuplicateChapters(book *models.Book, logger *log.Logger, threshold float64, frequentWords map[string]int) {
+	// Default threshold value (existing threshold)
+	//threshold := 0.7
+
 	// Loop through the chapters to find duplicates
 	for i := 0; i < len(book.Chapters); i++ {
 		originalChapter := &book.Chapters[i]
@@ -48,7 +58,7 @@ func MergeDuplicateChapters(book *models.Book, logger *log.Logger, threshold flo
 			duplicateChapter := &book.Chapters[j]
 
 			// Perform fuzzy comparison of the chapter titles
-			similarity := FuzzySimilarity(book, logger, frequentWords, originalChapter.Title, duplicateChapter.Title)
+			similarity := FuzzySimilarity(book, logger, frequentWords, originalChapter.Title, duplicateChapter.Title, threshold)
 
 			if similarity > threshold {
 				// Log the merge process
