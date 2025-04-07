@@ -58,8 +58,8 @@ func FuzzySimilarity(book *models.Book, logger *log.Logger, frequentWords map[st
 }
 
 // Function to merge duplicate chapters by fuzzy matching their titles
-// This will now stop merging after two chapters have been merged into an original chapter.
-func MergeDuplicateChapters(book *models.Book, logger *log.Logger, firstThreshold, subsequentThreshold float64, frequentWords map[string]int) []string {
+// This now checks the blocked combinations before merging.
+func MergeDuplicateChapters(book *models.Book, logger *log.Logger, firstThreshold, subsequentThreshold float64, frequentWords map[string]int, blockedCombinations map[string]bool) []string {
 	var removedChapters []string // List to store removed chapters with their numbers and titles
 	firstMatch := true           // Flag to track if it's the first match
 
@@ -71,6 +71,12 @@ func MergeDuplicateChapters(book *models.Book, logger *log.Logger, firstThreshol
 		// Compare this chapter with all subsequent chapters
 		for j := i + 1; j < len(book.Chapters); j++ {
 			duplicateChapter := &book.Chapters[j]
+
+			// Skip merging if this combination is blocked
+			if _, blocked := blockedCombinations[originalChapter.ChapterNumber+","+duplicateChapter.ChapterNumber]; blocked {
+				logger.Printf("Skipping merge for blocked combination: Chapter %s and Chapter %s\n", originalChapter.ChapterNumber, duplicateChapter.ChapterNumber)
+				continue
+			}
 
 			// Choose the threshold based on whether it's the first match or not
 			var threshold float64
@@ -126,6 +132,8 @@ func MergeDuplicateChapters(book *models.Book, logger *log.Logger, firstThreshol
 					break // Exit the loop to move on to the next original chapter
 				}
 			}
+			// After the first match, set the flag to false
+			firstMatch = false
 		}
 
 		// If two chapters have been merged, stop processing the current chapter
@@ -133,9 +141,6 @@ func MergeDuplicateChapters(book *models.Book, logger *log.Logger, firstThreshol
 			logger.Printf("Finished merging chapters for Chapter %s (%s), moving to the next chapter.\n", originalChapter.ChapterNumber, originalChapter.Title)
 			continue // Move on to the next original chapter
 		}
-
-		// After the first match, set the flag to false
-		firstMatch = false
 	}
 
 	// Log the removed chapters for debugging
@@ -385,5 +390,63 @@ func ListChaptersAndSectionsWithoutDuplicates(book *models.Book, sectionMap map[
 
 		// Add an extra line between chapters for better readability
 		fmt.Fprintln(logFile)
+	}
+}
+
+// Function to load blocked chapter combinations from a file
+func LoadBlockedCombinations(filePath string) map[string]bool {
+	blockedCombinations := make(map[string]bool)
+
+	// Open the blocked combinations file
+	file, err := os.Open(filePath)
+	if err != nil {
+		// If the file does not exist (e.g., the first run), return an empty map
+		if os.IsNotExist(err) {
+			return blockedCombinations
+		}
+		fmt.Printf("Error opening file: %v\n", err)
+		return nil
+	}
+	defer file.Close()
+
+	// Read the file line by line
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		// Skip empty lines
+		if line == "" {
+			continue
+		}
+
+		// Assume the format is "ChapterX,ChapterY" (e.g., "3,17")
+		parts := strings.Split(line, ",")
+		if len(parts) == 2 {
+			blockedCombinations[parts[0]+","+parts[1]] = true
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		fmt.Printf("Error reading file: %v\n", err)
+	}
+
+	return blockedCombinations
+}
+
+// Function to write blocked combinations to a file
+func WriteBlockedCombinations(filePath string, blockedCombinations map[string]bool) {
+	// Open the file for writing (create it from scratch)
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		fmt.Printf("Error opening file for writing: %v\n", err)
+		return
+	}
+	defer file.Close()
+
+	// Write each blocked combination to the file
+	for combination := range blockedCombinations {
+		_, err := file.WriteString(combination + "\n")
+		if err != nil {
+			fmt.Printf("Error writing to file: %v\n", err)
+		}
 	}
 }
