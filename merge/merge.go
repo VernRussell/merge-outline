@@ -486,3 +486,102 @@ func fuzzySimilarity(book *models.Book, logger *log.Logger, filteredWords map[st
 
 	return similarity
 }
+
+// Function to find duplicates, marking sections as "good", "duplicate", or "unique"
+// Function to find duplicates, marking sections as "good", "duplicate", or "unique"
+func FindAndMarkSections(sections []models.Section, book *models.Book, logger *log.Logger, frequentWords map[string]int, threshold float64) map[string]models.SectionState {
+	sectionMap := make(map[string]models.SectionState)
+	//processed := make(map[string]bool) // Keeps track of sections already marked as "good" or "duplicate"
+
+	// Sort sections by their section number in ascending order
+	//sortSectionsByNumber(sections)
+
+	// Iterate through the sections in sorted order
+	for i := 0; i < len(sections); i++ {
+		currentSection := &sections[i]
+		// Initialize the section state to "unchecked"
+		if _, exists := sectionMap[currentSection.SectionNumber]; !exists {
+			sectionMap[currentSection.SectionNumber] = models.SectionState{
+				Section: *currentSection,
+				State:   "unchecked", // Default state
+			}
+		}
+
+		// Skip sections that are already marked as "duplicate"
+		if sectionMap[currentSection.SectionNumber].State == "duplicate" {
+			continue
+		}
+
+		// If this section has not been processed yet, process it
+		if sectionMap[currentSection.SectionNumber].State == "unchecked" {
+			// Compare the current section to all previous sections in sorted order
+			markedAsDuplicate := false
+			for j := 0; j < i; j++ {
+				otherSection := &sections[j]
+
+				// Skip if already processed as "good" or "duplicate"
+				if sectionMap[otherSection.SectionNumber].State == "duplicate" || sectionMap[otherSection.SectionNumber].State == "good" {
+					continue
+				}
+
+				// Use FuzzySimilarity to check similarity between section titles
+				similarity := fuzzySimilarity(book, logger, frequentWords, currentSection.SectionTitle, otherSection.SectionTitle)
+
+				// Debugging: Print the similarity score for each comparison
+				log.Printf("Comparing '%s' with '%s' | Similarity: %.2f\n", currentSection.SectionTitle, otherSection.SectionTitle, similarity)
+
+				// If similarity exceeds the threshold, mark as "good" and "duplicate"
+				if similarity >= threshold {
+					// Mark the current section as "good" and the matched one as "duplicate"
+					sectionMap[currentSection.SectionNumber] = models.SectionState{
+						Section: *currentSection,
+						State:   "good",
+					}
+					sectionMap[otherSection.SectionNumber] = models.SectionState{
+						Section: *otherSection,
+						State:   "duplicate",
+					}
+					markedAsDuplicate = true
+					break // Exit inner loop after finding a match
+				}
+			}
+
+			// If no match was found, mark it as "unique"
+			if !markedAsDuplicate {
+				sectionMap[currentSection.SectionNumber] = models.SectionState{
+					Section: *currentSection,
+					State:   "unique",
+				}
+			}
+		}
+	}
+
+	// Convert the map to a slice to allow sorting
+	var sortedSections []models.SectionState
+	for _, sectionState := range sectionMap {
+		sortedSections = append(sortedSections, sectionState)
+	}
+
+	// Sort the slice by SectionNumber (ascending) and then by State ("good", "duplicate", "unique")
+	sort.Slice(sortedSections, func(i, j int) bool {
+		// First compare by SectionNumber
+		if sortedSections[i].Section.SectionNumber != sortedSections[j].Section.SectionNumber {
+			return sortedSections[i].Section.SectionNumber < sortedSections[j].Section.SectionNumber
+		}
+		// Then compare by State ("good" comes before "duplicate", then "unique")
+		stateOrder := map[string]int{
+			"good":      1,
+			"duplicate": 2,
+			"unique":    3,
+		}
+		return stateOrder[sortedSections[i].State] < stateOrder[sortedSections[j].State]
+	})
+
+	// Convert the sorted slice back to a map for return
+	sortedSectionMap := make(map[string]models.SectionState)
+	for _, sectionState := range sortedSections {
+		sortedSectionMap[sectionState.Section.SectionNumber] = sectionState
+	}
+
+	return sortedSectionMap
+}

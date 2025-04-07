@@ -38,3 +38,9 @@ type Book struct {
 	Chapters   []Chapter `json:"chapters"`
 	Conclusion *Extra    `json:"conclusion,omitempty"`
 }
+
+// Define a struct to hold Section and its state (good, duplicate, unique, unchecked)
+type SectionState struct {
+	Section Section
+	State   string // "unchecked", "good", "duplicate", "unique"
+}

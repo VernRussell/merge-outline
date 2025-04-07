@@ -48,9 +48,17 @@ func main() {
 
 	// List of n-gram sizes you want to process (e.g., 2, 3, and 7)
 	ngramSizes := []int{2, 3, 7}
+	// Set the threshold for fuzzy matching (e.g., 0.7 for 70% similarity)
+	threshold := 0.7
 
 	// Call the processChapters function to collect, compare, and print the n-grams
 	merge.ProcessChapters(book, logger, ngramSizes, chaptersToInclude, frequentWords)
+
+	// Renumber chapters and sections
+	utils.RenumberChaptersAndSections(book)
+
+	// Call the function to process chapters and sections
+	merge.ProcessChaptersAndSections(book, threshold, logger, frequentWords)
 
 	// Remove duplicate descriptions
 	merge.RemoveDuplicateDescriptions(book, logger)

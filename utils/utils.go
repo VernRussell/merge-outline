@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/VernRussell/merge-outline/models"
@@ -167,6 +169,49 @@ func CompareFiles(file1, file2, logFile string) error {
 	return nil
 }
 
+// Function to collect all sections into a single list (with number and title)
+func CollectSections(book *models.Book) []models.Section {
+	var sections []models.Section
+	// Iterate through chapters and sections
+	for _, chapter := range book.Chapters {
+		for _, section := range chapter.Sections {
+			sectionInfo := models.Section{
+				SectionNumber: section.SectionNumber,
+				SectionTitle:  section.SectionTitle,
+			}
+			sections = append(sections, sectionInfo)
+		}
+	}
+	return sections
+}
+
+// Function to sort sections by SectionNumber (numerically)
+func SortSectionsByNumber(sections []models.Section) []models.Section {
+	// Sort sections by SectionNumber numerically
+	sort.Slice(sections, func(i, j int) bool {
+		// Split the section numbers into parts (e.g., "16.1" -> [16, 1])
+		sectionPartsI := strings.Split(sections[i].SectionNumber, ".")
+		sectionPartsJ := strings.Split(sections[j].SectionNumber, ".")
+
+		// Convert to integer for proper numerical comparison
+		numI, _ := strconv.Atoi(sectionPartsI[0])
+		numJ, _ := strconv.Atoi(sectionPartsJ[0])
+
+		// First compare the major number (e.g., 16 vs. 17)
+		if numI != numJ {
+			return numI < numJ
+		}
+
+		// If major numbers are the same, compare the minor numbers (e.g., 1 vs. 2)
+		minorI, _ := strconv.Atoi(sectionPartsI[1])
+		minorJ, _ := strconv.Atoi(sectionPartsJ[1])
+
+		return minorI < minorJ
+	})
+
+	return sections
+}
+
 // Function to print chapters and their sections
 // Function to print chapters and their sections, writing clean output to a .txt file
 func ListChaptersAndSections(book *models.Book) {
@@ -187,6 +232,45 @@ func ListChaptersAndSections(book *models.Book) {
 		for _, section := range chapter.Sections {
 			// Write the section number and title to the file, slightly indented
 			fmt.Fprintf(logFile, "    Section %s: %s\n", section.SectionNumber, section.SectionTitle)
+		}
+
+		// Add an extra line between chapters for better readability
+		fmt.Fprintln(logFile)
+	}
+}
+
+// Function to print chapters and their sections, excluding duplicates
+func ListChaptersAndSectionsWithoutDuplicates(book *models.Book, sectionMap map[string]models.SectionState) {
+	// Open the file for writing (create it if it doesn't exist)
+	logFile, err := os.OpenFile("ChaptersAndSectionsWithoutDuplicates.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Printf("Error opening log file: %v", err)
+		return
+	}
+	defer logFile.Close()
+
+	// Iterate through the chapters in the book
+	for _, chapter := range book.Chapters {
+		// Write the chapter number and title to the file
+		fmt.Fprintf(logFile, "Chapter %s: %s\n", chapter.ChapterNumber, chapter.Title)
+
+		// Iterate through the sections in the current chapter
+		for _, section := range chapter.Sections {
+			// Get the state of the current section from the sectionMap
+			sectionState, exists := sectionMap[section.SectionNumber]
+			if !exists {
+				// If the section is not in the map, consider it unique by default
+				sectionState = models.SectionState{
+					Section: section,
+					State:   "unique", // Default to "unique" if not marked
+				}
+			}
+
+			// Only write the section if it is not marked as a duplicate
+			if sectionState.State != "duplicate" {
+				// Write the section number and title to the file, slightly indented
+				fmt.Fprintf(logFile, "    Section %s: %s\n", section.SectionNumber, section.SectionTitle)
+			}
 		}
 
 		// Add an extra line between chapters for better readability
