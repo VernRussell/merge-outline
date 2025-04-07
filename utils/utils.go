@@ -37,49 +37,73 @@ func CalculateFrequentWords(book *models.Book) map[string]int {
 	return frequentWords
 }
 
-// FuzzySimilarity calculates the similarity between two strings using the Jaro-Winkler distance
-// and compares it against a configurable threshold.
 func FuzzySimilarity(book *models.Book, logger *log.Logger, frequentWords map[string]int, s1, s2 string, threshold float64) float64 {
-	// Use JaroWinkler or any other fuzzy matching algorithm
-	similarity := smetrics.JaroWinkler(s1, s2, 0.7, 4) // Adjust thresholds if needed
+	// Log the chapter titles being compared
+	logger.Printf("Comparing Chapter Titles: '%s' and '%s'\n", s1, s2)
 
-	// Compare the similarity with the threshold and return the similarity
+	// Use JaroWinkler or any other fuzzy matching algorithm
+	similarity := smetrics.JaroWinkler(s1, s2, 0.6, 2) // Adjust parameters
+
+	// Log the similarity score
+	logger.Printf("Calculated Similarity: %.2f (Threshold: %.2f)\n", similarity, threshold)
+
+	// Log the result of the comparison
 	if similarity >= threshold {
+		logger.Printf("Match Found: Similarity %.2f is above threshold %.2f\n", similarity, threshold)
 		return similarity
+	} else {
+		logger.Printf("No Match: Similarity %.2f is below threshold %.2f\n", similarity, threshold)
+		return 0.0
 	}
-	return 0.0 // Return 0 if similarity is below threshold
 }
 
 // Function to merge duplicate chapters by fuzzy matching their titles
-// This will now store the chapter number and title of removed chapters and return them sorted.
-func MergeDuplicateChapters(book *models.Book, logger *log.Logger, threshold float64, frequentWords map[string]int) []string {
+// This will now stop merging after two chapters have been merged into an original chapter.
+func MergeDuplicateChapters(book *models.Book, logger *log.Logger, firstThreshold, subsequentThreshold float64, frequentWords map[string]int) []string {
 	var removedChapters []string // List to store removed chapters with their numbers and titles
+	firstMatch := true           // Flag to track if it's the first match
 
 	// Loop through the chapters to find duplicates
 	for i := 0; i < len(book.Chapters); i++ {
 		originalChapter := &book.Chapters[i]
+		mergedCount := 0 // Track how many chapters have been merged into the original chapter
 
 		// Compare this chapter with all subsequent chapters
 		for j := i + 1; j < len(book.Chapters); j++ {
 			duplicateChapter := &book.Chapters[j]
 
+			// Choose the threshold based on whether it's the first match or not
+			var threshold float64
+			if firstMatch {
+				threshold = firstThreshold // Use the lower threshold for the first match
+			} else {
+				threshold = subsequentThreshold // Use the higher threshold for subsequent matches
+			}
+
 			// Perform fuzzy comparison of the chapter titles
 			similarity := FuzzySimilarity(book, logger, frequentWords, originalChapter.Title, duplicateChapter.Title, threshold)
 
+			// Log the similarity score for debugging
+			logger.Printf("Comparing Chapter %s (%s) with Chapter %s (%s) - Similarity Score: %.2f (Threshold: %.2f)\n",
+				originalChapter.ChapterNumber, originalChapter.Title,
+				duplicateChapter.ChapterNumber, duplicateChapter.Title,
+				similarity, threshold)
+
+			// If the similarity score exceeds the threshold, merge the chapters
 			if similarity > threshold {
-				// Log the merge process
+				// Log the merge process and store the removed chapter
 				logger.Printf("Merging Chapter %s (%s) with Chapter %s (%s) due to fuzzy match: %.2f\n",
-					originalChapter.ChapterNumber, originalChapter.Title, duplicateChapter.ChapterNumber, duplicateChapter.Title, similarity)
+					originalChapter.ChapterNumber, originalChapter.Title,
+					duplicateChapter.ChapterNumber, duplicateChapter.Title, similarity)
 
 				// Store the removed chapter with its number and title
 				removedChapters = append(removedChapters, fmt.Sprintf("Chapter %s: %s", duplicateChapter.ChapterNumber, duplicateChapter.Title))
 
 				// Move sections from duplicate chapter to the original chapter
-				// The sections from the duplicate chapter are added to the original chapter without renumbering
 				for _, duplicateSection := range duplicateChapter.Sections {
 					originalChapter.Sections = append(originalChapter.Sections, duplicateSection)
 
-					// Renumber descriptions and points in each section, but keep the original section numbers
+					// Renumber descriptions and points in each section
 					for k := 0; k < len(duplicateSection.Descriptions); k++ {
 						duplicateSection.Descriptions[k].DescriptionNumber = fmt.Sprintf("%s.%d", duplicateSection.SectionNumber, k+1)
 
@@ -93,11 +117,31 @@ func MergeDuplicateChapters(book *models.Book, logger *log.Logger, threshold flo
 				// Remove the duplicate chapter
 				book.Chapters = append(book.Chapters[:j], book.Chapters[j+1:]...)
 				j-- // Adjust the index after removal
+
+				// Increment the count of merged chapters
+				mergedCount++
+
+				// If two chapters have been merged into this original chapter, move on to the next original chapter
+				if mergedCount >= 2 {
+					break // Exit the loop to move on to the next original chapter
+				}
 			}
 		}
+
+		// If two chapters have been merged, stop processing the current chapter
+		if mergedCount >= 2 {
+			logger.Printf("Finished merging chapters for Chapter %s (%s), moving to the next chapter.\n", originalChapter.ChapterNumber, originalChapter.Title)
+			continue // Move on to the next original chapter
+		}
+
+		// After the first match, set the flag to false
+		firstMatch = false
 	}
 
-	// Sort the removed chapters by chapter number
+	// Log the removed chapters for debugging
+	logger.Printf("Removed Chapters: %v\n", removedChapters)
+
+	// Sort the removed chapters by chapter number (if needed)
 	sort.Strings(removedChapters)
 
 	return removedChapters

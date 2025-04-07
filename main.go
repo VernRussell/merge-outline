@@ -48,7 +48,7 @@ func main() {
 	fmt.Println(len(allSections))
 
 	// Merge duplicate chapters
-	duplicateChapters := utils.MergeDuplicateChapters(book, logger, 0.8, frequentWords)
+	duplicateChapters := utils.MergeDuplicateChapters(book, logger, 0.8, .7, frequentWords)
 
 	fmt.Println(duplicateChapters)
 
