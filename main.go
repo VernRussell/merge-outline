@@ -37,8 +37,22 @@ func main() {
 	// Calculate frequent words map for fuzzy comparison
 	frequentWords := utils.CalculateFrequentWords(book)
 
+	utils.RemoveDuplicateChapters(book, logger, frequentWords, 0.9)
+
+	utils.RenumberChaptersAndSections(book)
+
+	utils.ListChaptersAndSections(book, "NoDupeChapters", nil)
+
+	allSections := utils.SortSectionsByNumber(utils.CollectSections(book))
+
+	fmt.Println(len(allSections))
+
 	// Merge duplicate chapters
-	utils.MergeDuplicateChapters(book, logger, 0.8, frequentWords)
+	duplicateChapters := utils.MergeDuplicateChapters(book, logger, 0.8, frequentWords)
+
+	fmt.Println(duplicateChapters)
+
+	utils.ListChaptersAndSections(book, "MergedChapters", duplicateChapters)
 
 	chaptersToInclude := merge.GenerateChaptersToInclude(book)
 	fmt.Println(chaptersToInclude)
@@ -82,7 +96,7 @@ func main() {
 		log.Fatalf("Error writing book to MD File: %v", err)
 	}
 
-	utils.ListChaptersAndSections(book)
+	utils.ListChaptersAndSections(book, "Final", nil)
 
 	// Log success
 	logger.Println("Book successfully updated and written to JSON.")

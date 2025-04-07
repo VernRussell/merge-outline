@@ -14,6 +14,12 @@ import (
 	"github.com/xrash/smetrics"
 )
 
+// Struct to store chapter number and title
+type ChapterInfo struct {
+	ChapterNumber string
+	Title         string
+}
+
 // CalculateFrequentWords calculates frequent words in a Book object
 func CalculateFrequentWords(book *models.Book) map[string]int {
 	frequentWords := make(map[string]int)
@@ -45,9 +51,9 @@ func FuzzySimilarity(book *models.Book, logger *log.Logger, frequentWords map[st
 }
 
 // Function to merge duplicate chapters by fuzzy matching their titles
-func MergeDuplicateChapters(book *models.Book, logger *log.Logger, threshold float64, frequentWords map[string]int) {
-	// Default threshold value (existing threshold)
-	//threshold := 0.7
+// This will now store the chapter number and title of removed chapters and return them sorted.
+func MergeDuplicateChapters(book *models.Book, logger *log.Logger, threshold float64, frequentWords map[string]int) []string {
+	var removedChapters []string // List to store removed chapters with their numbers and titles
 
 	// Loop through the chapters to find duplicates
 	for i := 0; i < len(book.Chapters); i++ {
@@ -64,6 +70,9 @@ func MergeDuplicateChapters(book *models.Book, logger *log.Logger, threshold flo
 				// Log the merge process
 				logger.Printf("Merging Chapter %s (%s) with Chapter %s (%s) due to fuzzy match: %.2f\n",
 					originalChapter.ChapterNumber, originalChapter.Title, duplicateChapter.ChapterNumber, duplicateChapter.Title, similarity)
+
+				// Store the removed chapter with its number and title
+				removedChapters = append(removedChapters, fmt.Sprintf("Chapter %s: %s", duplicateChapter.ChapterNumber, duplicateChapter.Title))
 
 				// Move sections from duplicate chapter to the original chapter
 				// The sections from the duplicate chapter are added to the original chapter without renumbering
@@ -84,6 +93,39 @@ func MergeDuplicateChapters(book *models.Book, logger *log.Logger, threshold flo
 				// Remove the duplicate chapter
 				book.Chapters = append(book.Chapters[:j], book.Chapters[j+1:]...)
 				j-- // Adjust the index after removal
+			}
+		}
+	}
+
+	// Sort the removed chapters by chapter number
+	sort.Strings(removedChapters)
+
+	return removedChapters
+}
+
+// Function to remove duplicate chapters based on fuzzy matching their titles
+// This function will now take a user-provided threshold for similarity and remove all sections associated with duplicate chapters.
+func RemoveDuplicateChapters(book *models.Book, logger *log.Logger, frequentWords map[string]int, threshold float64) {
+	// Loop through the chapters to find duplicates
+	for i := 0; i < len(book.Chapters); i++ {
+		originalChapter := &book.Chapters[i]
+
+		// Compare this chapter with all subsequent chapters
+		for j := i + 1; j < len(book.Chapters); j++ {
+			duplicateChapter := &book.Chapters[j]
+
+			// Perform fuzzy comparison of the chapter titles
+			similarity := FuzzySimilarity(book, logger, frequentWords, originalChapter.Title, duplicateChapter.Title, threshold)
+
+			// If the chapters are similar enough, remove the duplicate chapter and all of its sections
+			if similarity >= threshold {
+				// Log the removal process
+				logger.Printf("Removing Duplicate Chapter %s (%s) because it matches Chapter %s (%s) with similarity: %.2f\n",
+					duplicateChapter.ChapterNumber, duplicateChapter.Title, originalChapter.ChapterNumber, originalChapter.Title, similarity)
+
+				// Remove the duplicate chapter and all associated sections and descriptions
+				book.Chapters = append(book.Chapters[:j], book.Chapters[j+1:]...)
+				j-- // Adjust the index after removal to prevent skipping a chapter
 			}
 		}
 	}
@@ -222,18 +264,32 @@ func SortSectionsByNumber(sections []models.Section) []models.Section {
 	return sections
 }
 
-// Function to print chapters and their sections
 // Function to print chapters and their sections, writing clean output to a .txt file
-func ListChaptersAndSections(book *models.Book) {
-	// Open the file for writing (create it if it doesn't exist)
-	logFile, err := os.OpenFile("ChaptersAndSections.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+// Accepts a slice of strings for duplicateChapters (merged chapters) to output them at the top if provided.
+func ListChaptersAndSections(book *models.Book, suffix string, duplicateChapters []string) {
+	// Create the file name with the suffix appended
+	fileName := fmt.Sprintf("ChaptersAndSections_%s.txt", suffix)
+
+	// Open the file for writing (create it from scratch)
+	logFile, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		fmt.Printf("Error opening log file: %v", err)
 		return
 	}
 	defer logFile.Close()
 
-	// Iterate through the chapters in the book
+	// If duplicateChapters is provided (not nil or empty), output them at the top of the file
+	if len(duplicateChapters) > 0 {
+		fmt.Fprintln(logFile, "Merged Duplicate Chapters:")
+		for _, chapter := range duplicateChapters {
+			// Print each chapter in the format "Chapter {Number}: {Title}"
+			fmt.Fprintln(logFile, chapter)
+		}
+		// Add a line break before listing the regular chapters
+		fmt.Fprintln(logFile)
+	}
+
+	// Iterate through the chapters in the book and output them
 	for _, chapter := range book.Chapters {
 		// Write the chapter number and title to the file
 		fmt.Fprintf(logFile, "Chapter %s: %s\n", chapter.ChapterNumber, chapter.Title)
